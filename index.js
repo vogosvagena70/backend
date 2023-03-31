@@ -11,7 +11,8 @@ app.use(cors())
 app.use(express.static('build'))
 
 
-   
+
+
 
 let notes = [
   {
@@ -35,7 +36,7 @@ let notes = [
 app.get('/', (request, response) => {
   console.log('test')
   response.send('<h1>Hello World!</h1>')
-  
+
 })
 
 app.get('/api/notes', (request, response) => {
@@ -43,41 +44,69 @@ app.get('/api/notes', (request, response) => {
     response.json(notes)
   })
 })
- 
 
-app.get('/api/notes/:id', (request, response) => {
-  const id = Number(request.params.id)
-  const note = notes.find(note => note.id === id)
-  if(note){
-    response.json(note).end()
-  }else{
-    response.status(404).end()
+
+app.get('/api/notes/:id', (request, response, next) => {
+  Note.findById(request.params.id).then(note => {
+    if (note) {
+      response.json(rs)
+    } else {
+      response.status(404).end()
+    }
+
+  }).catch(error => next(error))
+})
+
+app.put('/api/notes/:id', (request, response, next) => {
+  const body = request.body
+  const newNote = {
+    content: body.content,
+    important: body.important,
   }
-  
+
+  Note.findByIdAndUpdate(request.params.id, newNote, { new: true }).then(rs => {
+    response.json(rs)
+  }).catch(ex => next(ex))
 })
 
-app.delete('/api/notes/:id',(request, response)=>{
-  const id = Number(request.params.id)
-  notes = notes.filter(c=>c.id!==id)
-
-  response.status(204).end()
+app.delete('/api/notes/:id', (request, response) => {
+  Note.findByIdAndDelete(request.params.id).then(rs => {
+    response.status(204).end()
+  }).catch(er => next(er))
 })
 
-app.post('/api/notes',(request, response)=>{
-  const maxId = notes.length > 0
-    ? Math.max(...notes.map(n => n.id)) 
-    : 0
-    
-  const note = request.body
-  note.id = maxId + 1
+app.post('/api/notes', (request, response) => {
 
-  notes = notes.concat(note)
+  const body = request.body
 
-  response.json(note)
+  const note = new Note({
+    content: body.content,
+    important: body.important || false
+  })
+
+  note.save().then(savedNote => {
+    response.json(savedNote)
+  })
 
 })
 
 const PORT = process.env.PORT
+
+
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({
+      error: `ID is in wrong format`
+    })
+  }
+
+  next(error)
+}
+app.use(errorHandler)
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
